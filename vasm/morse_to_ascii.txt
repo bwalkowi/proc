@@ -1,0 +1,79 @@
+data:
+	tab:		db	0d, 'e', 't', 'i', 'a', 'n', 'm', 's', 'u', 'r', 'w', 'd', 'k', 'g', 'o', 'h', 'v', 'f', 0d, 'l', 0d, 'p', 'j', 'b', 'x'
+			db	'c', 'y', 'z', 'q', 0d, 0d, '5', '4', 0d, '3', 0d, 0d, 0d, '2', 0d, ' ', '+', 0d, 0d, 0d, 0d, '1', '6', '=', '/', 0d, 0d
+			db	0d, '(', 0d, '7', 0d, 0d, 0d, '8', 0d, '9', '0', 0d, 0d, 0d, 0d, 0d, 0d, 0d, 0d, 0d, 0d, 0d, 0d, '?', '_', 0d, 0d, 0d
+			db	0d, '"', 0d, 0d, '.', 0d, 0d, 0d, 0d, '@', 0d, 0d, 0d, 96d, 0d, 0d, '-', 0d, 0d, 0d, 0d, 0d, 0d, 0d, 0d, ';', '!', 0d, ')'
+			db	0d, 0d, 0d, 0d, 0d, ',', 0d, 0d, 0d, 0d, ':'
+
+
+	Wczyt:			db	"- -.-. .---- .---- .---- ..---", 0d, 0d
+
+	Result:			db	50 dup(00000000)
+
+enddata
+
+
+code:
+
+	lea	gx, Wczyt		;si bedziemy traktowac jako indeks Wczytu wiec kopiujemy do niego wartosc ax
+	lea	hx, Result		;di wskazuje na indeks stringu Result wiec na poczatku ustawiamy go na poczatek Resultu
+	lea	bx, tab			;bx bedziemy traktowac jako indeks tab w procedurze getASCII ktora bedziemy wywolywac
+	
+	dekoduj_loop:
+		mov	ax, byte ptr ds:[gx]	;przenosimy pokolei znaki ze stringu do al
+		test	ax, ax			;i sprawdzamy czy nie doszlismy do konca stringu
+		jz	dekoduj_fin		;jesli tak skaczemy do konca procedury
+
+ 		call	getASCII		;jesli jest to wczytujemy kolejne znaki az bedzie uda sie przetlumaczyc na ASCII ktory zwracany jest w al
+
+		mov	byte ptr ds:[hx], ax	;otrzymany znak wpisujemy do Result
+		inc	hx			;i zwiekszamy indeks przygotowujac sie na wpisanie kolejnego znaku
+				
+		jmp	dekoduj_loop		;i powtarzamy petle az do przetlumaczenia calego tekstu
+
+	dekoduj_fin:								
+		hlt
+;===========================================================================================================================================================
+getASCII:			;procedura znajduje znak ASCII dla kodu Morse'a i zwraca go w al, przesuwa tez si(wczytuje kod Morse'a) 
+	push	bx		
+	push	dx
+	push	hx		;bx, dx i di maja pozostac niezmienne wiec zapisujemy je na stosie
+
+	xor	dx, dx		;dx pokazywac bedzie indeks tab wiec na poczatku ustawiamy go na zero
+
+	getASCII_loop:
+		cmp	ax, 32d			;jesli trafilismy na spacje konczymy procedure zwracamy znak z indeksu na ktorym jestesmy
+		je	getASCII_fin
+		cmp	ax, 0d			;jesli trafilismy na koniec stringu konczymy procedure zwracamy znak z indeksu na ktorym jestesmy
+		je	getASCII_fin
+		cmp	ax, 45d			;jesli trafilismy na '-' idziemy w prawo na kopcu
+		je	gotoright
+		cmp	ax, 46d			;jesli trafilismy na '.' idziemy w lewo na kopcu
+		je	gotoleft
+
+		gotoright:				;jesli wczytalismy '-' kierujemy sie w prawo na kopcu
+			shl	dx, 1d			;czyli mnozymy dx razy 2 (stosujemy przesuniecie w lewo o 1)
+			add	dx, 2d			;i dodajemy 2 - w ten sposob jestesmy na wezle dziecku wezla z ktorego skakalismy
+			inc	gx			;zwiekszamy si i wczytujemy kolejny znak
+			mov	ax, byte ptr ds:[gx]
+			jmp	getASCII_loop
+
+		gotoleft:				;jesli wczytalismy '.' kierujemy sie w lewo na kopcu
+			shl	dx, 1d			;czyli mnozymy dx razy 2 (stosujemy przesuniecie w lewo o 1)
+			add	dx, 1d			;i dodajemy 1 - w ten sposob jestesmy na wezle dziecku wezla z ktorego skakalismy
+			inc	gx
+			mov	ax, byte ptr ds:[gx]
+			jmp	getASCII_loop
+
+	getASCII_fin:				;zdejmujemy wartosci ze stosu i powracamy z procedury ze znakiem ASCII znajdujacym sie w al
+		add	bx, dx			;zapisujemy znak z indeksu na ktorym skonczylismy poszukiwanie
+		mov	ax, byte ptr ds:[bx]
+
+		inc	gx			;jesli sie tu znalezlismy to znaczy ze natrafilismy na ' ' albo koniec Wczytu wiec zwiekszamy si
+	
+		pop	hx
+		pop	dx
+		pop	bx
+		ret
+
+endcode

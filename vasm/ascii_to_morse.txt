@@ -1,0 +1,95 @@
+data:
+	tab:		db	0d, 'e', 't', 'i', 'a', 'n', 'm', 's', 'u', 'r', 'w', 'd', 'k', 'g', 'o', 'h', 'v', 'f', 0d, 'l', 0d, 'p', 'j', 'b', 'x'
+			db	'c', 'y', 'z', 'q', 0d, 0d, '5', '4', 0d, '3', 0d, 0d, 0d, '2', 0d, ' ', '+', 0d, 0d, 0d, 0d, '1', '6', '=', '/', 0d, 0d
+			db	0d, '(', 0d, '7', 0d, 0d, 0d, '8', 0d, '9', '0', 0d, 0d, 0d, 0d, 0d, 0d, 0d, 0d, 0d, 0d, 0d, 0d, '?', '_', 0d, 0d, 0d
+			db	0d, '"', 0d, 0d, '.', 0d, 0d, 0d, 0d, '@', 0d, 0d, 0d, 96d, 0d, 0d, '-', 0d, 0d, 0d, 0d, 0d, 0d, 0d, 0d, ';', '!', 0d, ')'
+			db	0d, 0d, 0d, 0d, 0d, ',', 0d, 0d, 0d, 0d, ':'
+
+
+	Wczyt:			db	"tc1112", 0d, 0d
+
+	Result:			db	100 dup(00000000)
+
+enddata
+
+
+code:
+
+	lea	gx, Wczyt		;si bedziemy traktowac jako indeks Wczytu 
+	lea	hx, Result		;di wskazuje na indeks stringu Result wiec na poczatku ustawiamy go na poczatek Resultu
+	lea	fx, tab
+
+    	mov     cx, 45d
+	mov     dx, 46d
+
+	koduj_loop:
+		mov	ax, byte ptr ds:[gx]		;przenosimy pokolei znaki ASCII ze stringu Wczyt do al
+		test	ax, ax				;i sprawdzamy czy nie doszlismy do konca stringu
+		jz	koduj_fin			;jesli tak skaczemy do konca procedury
+
+ 		call	ifIsUpperCaseConvertToLower
+		call	findsign
+		call	changeToMorse			;jesli tak to konwertujemy go na Morse'a
+
+		mov ex, 32d
+		mov	byte ptr ds:[hx], ex		;po wpisaniu do Result kodu Morse stawiamy przerwe przed nastepnym kodem
+		inc	hx					
+		
+		inc	gx				;zwiekszamy indeks si (Wczyt) i powtarzamy petle
+		jmp	koduj_loop
+
+	koduj_fin:					;na koniec wypisujemy wynik, sciagamy wartosci ze stosu i powracamy z procedury
+		hlt
+;===========================================================================================================================================================
+findsign:					;procedura znajduje dany znak znajdujacy sie w al w tablicy tab, indeks znalezionego elementu zwracamy w bx				
+	lea	bx, tab				;bx bedziemy traktowali jako indeks tablicy tab 
+
+	find_loop:					;przejezdzamy przez tablice w poszukiwaniu znaku
+	 	mov 	ex, byte ptr ds:[bx]
+		cmp	ax, ex				;jesli go znalezlismy skaczemy do find_found
+		je	find_found
+		inc	bx				;jak nie skaczemy na kolejny indeks tablicy
+		jmp	find_loop			;i zmniejszamy ilosc dostepnych znakow, by nie wyskoczyc poza indeks tablicy
+
+	find_found:					;jesli znalezlismy znak to teraz musimy obliczyc jego indeks w tablicy
+		sub	bx, fx				;w tym celu odejmujemy od bx adres poczatku tablicy
+		ret
+;===========================================================================================================================================================
+changeToMorse:					;procedura zamienia dany znak ASCII z al na kod Morse'a, wynik wpisujemy do stringu wskazanego przez di
+	push	bx					
+
+	test	bx, bx				;warunkiem konca jest osiagniecie przez bx wartosci 0
+	jz	changeToMorse_fin		
+
+	dec	bx				;aby skoczyc na poprzedni wezel w kopcu musimy najpierw odjac 1 od indeksu a potem podzielic przez 2
+	shr	bx, 1d				;w tym celu stosujemy przesuniecie bitowe w prawo o 1 a reszta z dzielenia (0 lub 1) laduje w cf
+	pushf					;przed wywolaniem rekurencyjnym procedury zapisujemy stan flag aby potem sprawdzic czy wezel na
+						;ktorym bylismy byl parzysty (cf = 1) czy nieparzysty (cf = 0)
+	call	changeToMorse			;wywolujemy procedure z parametrem bedacym rodzicem wezla ktory byl argumentem wywolania funkcji
+
+	popf			
+	jnc	put_dot				;jesli reszta z dzielenia rowna sie 0 to argument musial byc nieparzysty a na nieparzystych wezlach stawiamy kropki
+
+	mov	byte ptr ds:[hx], cx		;w przeciwnym wypadku bylismy na parzystym wezle a na nich znajduja sie kreski
+	inc	hx				;i to je wstawiamy do resultu w miejsce wskazane przez di
+	jmp	changeToMorse_fin		;wywolanie rekurencyjne powoduje ze znaki '.' i '-' sa wypisane w odpowiedniej kolejnosci
+	
+	put_dot:
+		mov	byte ptr ds:[hx], dx		;wpisujemy '.' w odpowiednie miejsce wyniku (string Result)
+		inc	hx				;i zwiekszamy indeks by nie nadpisac wprowadzonego znaku
+	
+	changeToMorse_fin:				;zdejmujemy wartosci ze stosu i powracamy z procedury
+		pop	bx
+		ret
+;===========================================================================================================================================================
+ifIsUpperCaseConvertToLower:			;procedura sprawdza czy znak w al jest duza litera jesli tak to konwertuje go na mala litere				
+	cmp	ax, 65d				;sprawdzamy czy znak jest >=65 i <=90 jesli tak jest to duza litera
+	jl	Tolower_fin			;jesli nie jest to duza litera skaczemy do konca procedury
+	cmp	ax, 90d
+	jg	Tolower_fin
+	add	ax, 32d				;jesli jest to duza litera dadajemy 'A'-'a' by zamienic ja na mala
+
+	Tolower_fin:				;zdejmujemy wartosci ze stosu i powracamy z procedury
+		ret
+
+endcode
